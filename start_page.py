@@ -125,7 +125,7 @@ class SmartCartApp:
         header.pack(fill="x")
 
         back_btn = tk.Button(header, text="← Home", bg="#374151", fg="white",
-                             font=("Arial", 11), command=self.login_page)
+                             font=("Arial", 11), command=self.exit_page)  
         back_btn.place(x=10, y=10)
 
         title = tk.Label(header, text="MY CART", bg="#1f2937", fg="white",
@@ -175,11 +175,17 @@ class SmartCartApp:
         messagebox.showinfo("Scan Item", "Scanning item...")
         # Implement scan item logic here
 
+
+    def exit_page(self):
+        messagebox.showinfo("Exit", "Exiting to end page...")
+        self.clear_screen()
+        # Implement exit logic here  
+
     # ---------- COMMON FUNCTIONS ----------
     def clear_screen(self):
         for widget in self.root.winfo_children():
             widget.destroy()
-
+ 
 
 if __name__ == "__main__":
     root = tk.Tk()
