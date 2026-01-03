@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sqlite3
-#import cv2
-#from pyzbar.pyzbar import decode
+import cv2
+from pyzbar.pyzbar import decode
 
 class SmartCartApp:
     def __init__(self, root):
@@ -87,8 +87,8 @@ class SmartCartApp:
         button_frame.grid(row=3, column=0, sticky="ew", pady=20)
         button_frame.columnconfigure((0, 1, 2, 3), weight=1)
 
-        # self.scan_camera_button = ttk.Button(button_frame, text="Scan with Camera", command=self.scan_with_camera, style='Accent.TButton')
-        # self.scan_camera_button.grid(row=0, column=0, padx=5, ipady=10, sticky="ew")
+        self.scan_camera_button = ttk.Button(button_frame, text="Scan with Camera", command=self.scan_with_camera, style='Accent.TButton')
+        self.scan_camera_button.grid(row=0, column=0, padx=5, ipady=10, sticky="ew")
         
         self.scan_button = ttk.Button(button_frame, text="Simulate Scan", command=self.simulate_scan)
         self.scan_button.grid(row=0, column=1, padx=5, ipady=10, sticky="ew")
@@ -128,53 +128,54 @@ class SmartCartApp:
         style.configure('Treeview.Heading', font=('Arial', 14, 'bold'))
         style.map("Treeview", background=[('selected', '#0d6efd')])
 
-    # def scan_with_camera(self):
-    #     self.update_status("Opening camera... Please show a barcode.")
-    #     cap = cv2.VideoCapture(0)
+    def scan_with_camera(self):
+        self.update_status("Opening camera... Please show a barcode.")
+        cap = cv2.VideoCapture(1)
         
-    #     if not cap.isOpened():
-    #         messagebox.showerror("Camera Error", "Could not open webcam.")
-    #         self.update_status("Failed to open camera.", "error")
-    #         return
+        if not cap.isOpened():
+            messagebox.showerror("Camera Error", "Could not open webcam.")
+            self.update_status("Failed to open camera.", "error")
+            return
 
-    #     found_barcode = False
-    #     while not found_barcode:
-    #         success, img = cap.read()
-    #         if not success:
-    #             continue
+        found_barcode = False
+        while not found_barcode:
+            success, img = cap.read()
+            if not success:
+                continue
 
-    #         for barcode in decode(img):
-    #             barcode_data = barcode.data.decode('utf-8')
-    #             self.update_status(f"Barcode found: {barcode_data}")
+            for barcode in decode(img):
+                barcode_data = barcode.data.decode('utf-8')
+                self.update_status(f"Barcode found: {barcode_data}")
                 
-    #             # Look up product in DB
-    #             try:
-    #                 conn = sqlite3.connect('products.db')
-    #                 cursor = conn.cursor()
-    #                 cursor.execute("SELECT name, price FROM products WHERE barcode=?", (barcode_data,))
-    #                 product = cursor.fetchone()
-    #                 conn.close()
+                # Look up product in DB
+                try:
+                    conn = sqlite3.connect('products.db')
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT name, price FROM products WHERE barcode=?", (barcode_data,))
+                    product = cursor.fetchone()
+                    conn.close()
 
-    #                 if product:
-    #                     name, price = product
-    #                     self.add_item(barcode_data, name, price)
-    #                     self.update_status(f"Added: {name}")
-    #                 else:
-    #                     self.update_status(f"Barcode {barcode_data} not found in database.", "error")
+                    if product:
+                        name, price = product
+                        self.add_item(barcode_data, name, price)
+                        self.update_status(f"Added: {name}")
+                    else:
+                        self.update_status(f"Barcode {barcode_data} not found in database.", "error")
                     
-    #                 found_barcode = True
-    #                 break # Exit inner loop
-    #             except sqlite3.Error as e:
-    #                 self.update_status(f"Database error: {e}", "error")
+                    found_barcode = True
+                    break # Exit inner loop
+                except sqlite3.Error as e:
+                    self.update_status(f"Database error: {e}", "error")
 
-    #         cv2.imshow('Barcode Scanner', img)
-    #         if cv2.waitKey(1) & 0xFF == ord('q'): # Allow user to quit with 'q'
-    #             break
+            cv2.imshow('Barcode Scanner', img)
+            if cv2.waitKey(1) & 0xFF == ord('q') or \
+                cv2.getWindowProperty('Barcode Scanner', cv2.WND_PROP_VISIBLE) < 1:
+                break
         
-    #     cap.release()
-    #     cv2.destroyAllWindows()
-    #     if not found_barcode:
-    #         self.update_status("Camera closed. No item scanned.")
+        cap.release()
+        cv2.destroyAllWindows()
+        if not found_barcode:
+            self.update_status("Camera closed. No item scanned.")
 
 
     def simulate_scan(self):
@@ -196,6 +197,7 @@ class SmartCartApp:
             self.update_status(f"Database error: {e}", "error")
             messagebox.showerror("Database Error", "Could not connect to the product database. Please make sure 'products.db' exists and is valid.")
 
+
     def add_item(self, barcode, name, price):
         """Adds or updates an item in the cart."""
         if barcode in self.cart_items:
@@ -203,6 +205,7 @@ class SmartCartApp:
         else:
             self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1}
         self._update_cart_display()
+
 
     def remove_item(self):
         """Removes the selected item from the cart."""
