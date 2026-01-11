@@ -1,136 +1,128 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
-import sqlite3
+from tkinter import ttk, messagebox, font
 import cv2
 from pyzbar.pyzbar import decode
+import sqlite3
 
-class SmartCartApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Smart Shopping Cart")
-        self.root.geometry("800x480")
-        self.root.configure(bg="#f0f2f5")
-        self.root.minsize(700, 500) # Set a minimum size
+# --- Theme Constants ---
+THEME = {
+    "bg": "#101622", "card": "#151a25", "primary": "#135bec",
+    "primary_hover": "#2563eb", "white": "#ffffff", "gray": "#92a4c9",
+    "success": "#10b981", "danger": "#ef4444"
+}
 
+class SmartCartApp(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        self.configure(bg=THEME["bg"])
+        
         self.cart_items = {}
         self.total = 0.0
-        self.tax_rate = 0.05  # 5% tax
+        self.tax_rate = 0.05
 
-        # This makes the main window resizable
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
+        self.fonts = {
+            "header": font.Font(family="Helvetica", size=24, weight="bold"),
+            "sub": font.Font(family="Helvetica", size=14),
+            "table": font.Font(family="Arial", size=11),
+            "total": font.Font(family="Arial", size=16, weight="bold")
+        }
 
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        self._configure_styles()
         self._create_widgets()
         self._update_totals()
-        self.update_status("Welcome! Scan your first item to begin.")
         self._toggle_cart_view()
 
+    def on_show(self):
+        """Called when this screen appears"""
+        self.status_bar.config(text="System Ready. Scan item to begin.")
+        # Optional: Clear cart if coming from a fresh start
+        # self.cart_items = {}
+        # self._update_cart_display()
+
+    def _configure_styles(self):
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('TFrame', background=THEME["bg"])
+        style.configure('TLabel', background=THEME["bg"], foreground=THEME["white"])
+        style.configure('Card.TFrame', background=THEME["card"], relief='flat')
+        style.configure('Treeview', background=THEME["card"], fieldbackground=THEME["card"], foreground=THEME["white"], font=self.fonts["table"], rowheight=35, borderwidth=0)
+        style.configure('Treeview.Heading', background=THEME["bg"], foreground=THEME["gray"], font=("Helvetica", 10, "bold"))
+        style.map('Treeview', background=[('selected', THEME["primary"])])
+        
+        # Buttons
+        style.configure('TButton', font=("Helvetica", 11, "bold"), padding=10, borderwidth=0, background=THEME["card"], foreground=THEME["gray"])
+        style.map('TButton', background=[('active', THEME["primary"]), ('pressed', THEME["primary_hover"])], foreground=[('active', THEME["white"])])
+        
+        style.configure('Accent.TButton', background=THEME["primary"], foreground=THEME["white"])
+        style.map('Accent.TButton', background=[('active', THEME["primary_hover"])])
+        style.configure('Success.TButton', background=THEME["success"], foreground=THEME["white"])
+        style.configure('Danger.TButton', background=THEME["danger"], foreground=THEME["white"])
+        
+        style.configure('Totals.TFrame', background=THEME["card"])
+        style.configure('Totals.TLabel', background=THEME["card"], foreground=THEME["gray"], font=self.fonts["sub"])
+        style.configure('GrandTotal.TLabel', background=THEME["card"], foreground=THEME["primary"], font=self.fonts["total"])
+
     def _create_widgets(self):
-        # Main frame
-        main_frame = ttk.Frame(self.root, padding="20")
+        main_frame = ttk.Frame(self, padding="30")
         main_frame.grid(row=0, column=0, sticky="nsew")
         main_frame.columnconfigure(0, weight=1)
-        main_frame.rowconfigure(1, weight=1) # The cart frame will expand
+        main_frame.rowconfigure(1, weight=1)
 
-        # --- Header ---
-        header_frame = ttk.Frame(main_frame)
-        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 20))
+        # Header
+        ttk.Label(main_frame, text="SMART CART DASHBOARD", font=self.fonts["header"]).grid(row=0, column=0, sticky="w", pady=(0, 25))
 
-        header_label = ttk.Label(header_frame, text="Your Shopping Cart", font=("Arial", 24, "bold"), background="#f0f2f5")
-        header_label.pack(side=tk.LEFT)
-
-        # --- Cart items display ---
+        # Cart List
         self.cart_frame = ttk.Frame(main_frame, style='Card.TFrame')
         self.cart_frame.grid(row=1, column=0, sticky="nsew")
         self.cart_frame.columnconfigure(0, weight=1)
         self.cart_frame.rowconfigure(0, weight=1)
 
-        # Treeview for item list
         columns = ("name", "quantity", "price", "total")
-        self.tree = ttk.Treeview(self.cart_frame, columns=columns, show="headings", height=15)
-        self.tree.heading("name", text="Item Name")
-        self.tree.heading("quantity", text="Qty")
-        self.tree.heading("price", text="Unit Price")
-        self.tree.heading("total", text="Total")
+        self.tree = ttk.Treeview(self.cart_frame, columns=columns, show="headings", height=12)
+        self.tree.heading("name", text="PRODUCT NAME")
+        self.tree.heading("quantity", text="QTY")
+        self.tree.heading("price", text="UNIT PRICE")
+        self.tree.heading("total", text="TOTAL")
+        self.tree.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-        self.tree.column("name", width=300)
-        self.tree.column("quantity", anchor=tk.CENTER, width=80)
-        self.tree.column("price", anchor=tk.E, width=120)
-        self.tree.column("total", anchor=tk.E, width=120)
+        # Empty State
+        self.empty_cart_label = ttk.Label(main_frame, text="CART IS EMPTY", font=("Helvetica", 18), foreground=THEME["gray"], anchor="center")
 
-        self.tree.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
-        # Scrollbar for the treeview
-        scrollbar = ttk.Scrollbar(self.cart_frame, orient=tk.VERTICAL, command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.grid(row=0, column=1, sticky="ns")
-
-        # --- Empty Cart Message ---
-        self.empty_cart_label = ttk.Label(main_frame, text="Your cart is empty.", font=("Arial", 18), background="white", anchor="center")
-        # Will be placed on top of cart_frame using grid
-
-        # --- Totals Display ---
-        totals_frame = ttk.Frame(main_frame, padding=(0, 20, 0, 0), style='Totals.TFrame')
-        totals_frame.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        # Totals
+        totals_frame = ttk.Frame(main_frame, padding=20, style='Totals.TFrame')
+        totals_frame.grid(row=2, column=0, sticky="ew", pady=(20, 0))
         totals_frame.columnconfigure((0, 1, 2, 3), weight=1)
 
-        self.subtotal_label = ttk.Label(totals_frame, text="Subtotal: ₹0.00", font=("Arial", 14), background="#e9ecef")
-        self.subtotal_label.grid(row=0, column=0, sticky="w", padx=10, pady=5)
-        self.tax_label = ttk.Label(totals_frame, text="Tax (5%): ₹0.00", font=("Arial", 14), background="#e9ecef")
-        self.tax_label.grid(row=0, column=1, sticky="w", padx=10, pady=5)
-        self.total_label = ttk.Label(totals_frame, text="Total: ₹0.00", font=("Arial", 18, "bold"), background="#e9ecef")
-        self.total_label.grid(row=0, column=3, sticky="e", padx=10, pady=5)
+        self.subtotal_label = ttk.Label(totals_frame, text="Subtotal: ₹0.00", style='Totals.TLabel')
+        self.subtotal_label.grid(row=0, column=0, sticky="w")
+        self.tax_label = ttk.Label(totals_frame, text="Tax (5%): ₹0.00", style='Totals.TLabel')
+        self.tax_label.grid(row=0, column=1, sticky="w")
+        self.total_label = ttk.Label(totals_frame, text="Total: ₹0.00", style='GrandTotal.TLabel')
+        self.total_label.grid(row=0, column=3, sticky="e")
 
+        # Buttons
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.grid(row=3, column=0, sticky="ew", pady=30)
+        btn_frame.columnconfigure((0, 1, 2, 3), weight=1)
 
-        # --- Buttons ---
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=3, column=0, sticky="ew", pady=20)
-        button_frame.columnconfigure((0, 1, 2, 3), weight=1)
+        ttk.Button(btn_frame, text="📷 SCAN", command=self.scan_with_camera, style='Accent.TButton').grid(row=0, column=0, padx=5, sticky="ew")
+        ttk.Button(btn_frame, text="🎲 SIMULATE", command=self.simulate_scan).grid(row=0, column=1, padx=5, sticky="ew")
+        ttk.Button(btn_frame, text="🗑 REMOVE", command=self.remove_item, style='Danger.TButton').grid(row=0, column=2, padx=5, sticky="ew")
+        ttk.Button(btn_frame, text="✔ CHECKOUT", command=self.checkout, style='Success.TButton').grid(row=0, column=3, padx=5, sticky="ew")
 
-        self.scan_camera_button = ttk.Button(button_frame, text="Scan with Camera", command=self.scan_with_camera, style='Accent.TButton')
-        self.scan_camera_button.grid(row=0, column=0, padx=5, ipady=10, sticky="ew")
-        
-        self.scan_button = ttk.Button(button_frame, text="Simulate Scan", command=self.simulate_scan)
-        self.scan_button.grid(row=0, column=1, padx=5, ipady=10, sticky="ew")
-
-        self.remove_button = ttk.Button(button_frame, text="Remove Selected", command=self.remove_item)
-        self.remove_button.grid(row=0, column=2, padx=5, ipady=10, sticky="ew")
-
-        self.checkout_button = ttk.Button(button_frame, text="Checkout", command=self.checkout, style='Success.TButton')
-        self.checkout_button.grid(row=0, column=3, padx=5, ipady=10, sticky="ew")
-
-        # --- Status Bar ---
-        self.status_bar = ttk.Label(self.root, text="Welcome!", relief=tk.SUNKEN, anchor=tk.W, padding=5)
+        # Status Bar
+        self.status_bar = ttk.Label(self, text="Welcome", padding=10, background=THEME["primary"], foreground=THEME["white"])
         self.status_bar.grid(row=1, column=0, sticky="ew")
+        
 
-        self._configure_styles()
-
-    def _configure_styles(self):
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure('TFrame', background='#f0f2f5')
-        style.configure('Card.TFrame', background='white', relief='raised', borderwidth=1)
-        style.configure('Totals.TFrame', background='#e9ecef', relief='groove')
-        style.configure('TButton', font=('Arial', 12), padding=10, background='#ffffff', foreground='#333333')
-        style.map('TButton',
-            background=[('active', '#e0e0e0')],
-            foreground=[('active', '#000000')]
-        )
-        style.configure('Accent.TButton', font=('Arial', 12, 'bold'), background='#0d6efd', foreground='white')
-        style.map('Accent.TButton',
-            background=[('active', '#0b5ed7')]
-        )
-        style.configure('Success.TButton', font=('Arial', 12, 'bold'), background='#198754', foreground='white')
-        style.map('Success.TButton',
-            background=[('active', '#157347')]
-        )
-        style.configure('Treeview', rowheight=30, font=('Arial', 12))
-        style.configure('Treeview.Heading', font=('Arial', 14, 'bold'))
-        style.map("Treeview", background=[('selected', '#0d6efd')])
-
+    #Scan with Camera
     def scan_with_camera(self):
         self.update_status("Opening camera... Please show a barcode.")
-        cap = cv2.VideoCapture(1)
+        cap = cv2.VideoCapture(0) # Standard index is 0, changed from 1 for general compatibility
         
         if not cap.isOpened():
             messagebox.showerror("Camera Error", "Could not open webcam.")
@@ -176,77 +168,67 @@ class SmartCartApp:
         cv2.destroyAllWindows()
         if not found_barcode:
             self.update_status("Camera closed. No item scanned.")
-
-
+        
+        
+    # Simulate Scan from Database
     def simulate_scan(self):
         """Simulates scanning a random item from the database."""
         try:
-            conn = sqlite3.connect('products.db')
+            conn = sqlite3.connect('cart_database.db')
             cursor = conn.cursor()
-            cursor.execute("SELECT barcode, name, price, weight_grams FROM products ORDER BY RANDOM() LIMIT 1")
+            cursor.execute("SELECT barcode, product_name, mrp FROM products ORDER BY RANDOM() LIMIT 1")
             product = cursor.fetchone()
             conn.close()
 
             if product:
-                barcode, name, price, weight = product
-                self.add_item(barcode, name, price)
-                self.update_status(f"Scanned: {name}")
+                barcode, product_name, price = product
+                self.add_item(barcode, product_name, price)
+                self.update_status(f"Scanned: {product_name}")
             else:
                 self.update_status("Database is empty. No item to scan.", "error")
         except sqlite3.Error as e:
             self.update_status(f"Database error: {e}", "error")
-            messagebox.showerror("Database Error", "Could not connect to the product database. Please make sure 'products.db' exists and is valid.")
+            # Create a mock DB if it doesn't exist for testing purposes
+            messagebox.showinfo("Info", "Error accessing database.")
+            # self.create_mock_db()
 
+
+    def add_item_from_db(self, barcode):
+        # In a real app, query SQLite here
+        # For now, we simulate a DB hit
+        self.add_item(barcode, f"Item-{barcode}", 100.0)
 
     def add_item(self, barcode, name, price):
-        """Adds or updates an item in the cart."""
         if barcode in self.cart_items:
             self.cart_items[barcode]['quantity'] += 1
         else:
             self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1}
         self._update_cart_display()
-
+        self.status_bar.config(text=f"Added: {name}")
 
     def remove_item(self):
-        """Removes the selected item from the cart."""
-        selected_item = self.tree.selection()
-        if not selected_item:
-            messagebox.showwarning("No Selection", "Please select an item to remove.")
-            return
-
-        item_id = selected_item[0]
-        item_name = self.tree.item(item_id, 'values')[0]
-        barcode_to_remove = None
-        for barcode, details in self.cart_items.items():
-            if details['name'] == item_name:
-                barcode_to_remove = barcode
-                break
-
-        if barcode_to_remove:
-            if self.cart_items[barcode_to_remove]['quantity'] > 1:
-                 self.cart_items[barcode_to_remove]['quantity'] -= 1
+        selected = self.tree.selection()
+        if not selected: return
+        item_name = self.tree.item(selected[0], 'values')[0]
+        
+        # Find barcode by name (inefficient but works for small lists)
+        target_code = next((code for code, det in self.cart_items.items() if det['name'] == item_name), None)
+        if target_code:
+            if self.cart_items[target_code]['quantity'] > 1:
+                self.cart_items[target_code]['quantity'] -= 1
             else:
-                del self.cart_items[barcode_to_remove]
-            self.update_status(f"Removed one unit of {item_name}.")
+                del self.cart_items[target_code]
         self._update_cart_display()
 
     def _update_cart_display(self):
-        """Refreshes the items list in the UI."""
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-
-        for barcode, details in self.cart_items.items():
-            name = details['name']
-            quantity = details['quantity']
-            price = details['price']
-            total_price = price * quantity
-            self.tree.insert("", tk.END, values=(name, quantity, f"₹{price:.2f}", f"₹{total_price:.2f}"))
-
+        for i in self.tree.get_children(): self.tree.delete(i)
+        for code, item in self.cart_items.items():
+            total = item['price'] * item['quantity']
+            self.tree.insert("", "end", values=(item['name'], item['quantity'], f"₹{item['price']}", f"₹{total}"))
         self._update_totals()
         self._toggle_cart_view()
 
     def _toggle_cart_view(self):
-        """Shows or hides the empty cart message."""
         if not self.cart_items:
             self.empty_cart_label.grid(row=1, column=0, sticky="nsew")
             self.cart_frame.grid_remove()
@@ -255,36 +237,38 @@ class SmartCartApp:
             self.cart_frame.grid()
 
     def _update_totals(self):
-        """Calculates and updates subtotal, tax, and total."""
-        self.subtotal = sum(item['price'] * item['quantity'] for item in self.cart_items.values())
+        self.subtotal = sum(i['price'] * i['quantity'] for i in self.cart_items.values())
         self.tax = self.subtotal * self.tax_rate
         self.total = self.subtotal + self.tax
-
-        self.subtotal_label.config(text=f"Subtotal: ₹{self.subtotal:.2f}")
-        self.tax_label.config(text=f"Tax ({self.tax_rate:.0%}): ₹{self.tax:.2f}")
-        self.total_label.config(text=f"Total: ₹{self.total:.2f}")
+        self.subtotal_label.config(text=f"SUBTOTAL: ₹{self.subtotal:.2f}")
+        self.tax_label.config(text=f"TAX (5%): ₹{self.tax:.2f}")
+        self.total_label.config(text=f"TOTAL: ₹{self.total:.2f}")
+        
+        
+    def update_status(self, message, level="info"):
+        self.status_bar.config(text=f"  {message}")
+        if level == "error":
+            self.status_bar.config(background=THEME["danger"], foreground="white")
+        elif level == "success":
+            self.status_bar.config(background=THEME["success"], foreground="white")
+        else:
+            self.status_bar.config(background=THEME["primary"], foreground="white")
+            
+    
 
     def checkout(self):
-        """Handles the checkout process."""
         if not self.cart_items:
-            messagebox.showinfo("Empty Cart", "Your cart is empty. Please scan items to checkout.")
+            messagebox.showwarning("Empty", "Cart is empty!")
             return
-
+        
         checkout_message = f"Your total bill is ₹{self.total:.2f}.\n\nThank you for shopping with us!"
         messagebox.showinfo("Checkout Successful", checkout_message)
-        self.update_status("Checkout complete! Thank you.")
-        self.cart_items.clear()
-        self._update_cart_display()
-
-    def update_status(self, message, level="info"):
-        self.status_bar.config(text=message)
-        if level == "error":
-            self.status_bar.config(background="#dc3545", foreground="white")
-        else:
-            self.status_bar.config(background="#f0f2f5", foreground="black")
-
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = SmartCartApp(root)
-    root.mainloop()
+        self.update_status("Checkout complete! Thank you.", "success")
+        
+        # --- CRITICAL: PASS DATA TO CONTROLLER ---
+        self.controller.shared_data["cart_items"] = self.cart_items
+        self.controller.shared_data["cart_total"] = self.total
+        self.controller.shared_data["pending_checkout"] = True
+        
+        # Switch to Auth for payment/verification
+        self.controller.show_frame("AuthApp")
