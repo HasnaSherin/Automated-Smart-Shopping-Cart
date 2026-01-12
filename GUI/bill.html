@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electronic Invoice - City Center Mall</title>
+    <style>
+        /* General Page Styles */
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #f6f6f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Invoice Container */
+        .invoice-box {
+            max-width: 800px;
+            margin: auto;
+            padding: 30px;
+            border: 1px solid #eee;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+            background-color: #fff;
+        }
+
+        /* Header Section */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 20px;
+        }
+
+        .mall-details h1 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 24px;
+        }
+
+        .mall-details p {
+            margin: 5px 0 0;
+            font-size: 14px;
+            color: #777;
+        }
+
+        .invoice-details {
+            text-align: right;
+        }
+
+        .invoice-details h2 {
+            margin: 0;
+            color: #555;
+        }
+
+        .invoice-details p {
+            margin: 5px 0 0;
+            font-size: 14px;
+        }
+
+        /* Customer Info Section */
+        .customer-info {
+            margin-bottom: 30px;
+        }
+        .customer-info strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            line-height: inherit;
+            text-align: left;
+            border-collapse: collapse;
+        }
+
+        table th {
+            background-color: #f8f9fa;
+            color: #333;
+            font-weight: bold;
+            padding: 12px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* alignment for numbers */
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+
+        /* Total Calculation Section */
+        .totals-section {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .totals-table {
+            width: 300px;
+            border-collapse: collapse;
+        }
+
+        .totals-table td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .grand-total {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            border-top: 2px solid #333;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        /* Button for printing (Hide when printing) */
+        .btn-print {
+            display: block;
+            width: 100%;
+            max-width: 200px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .btn-print:hover {
+            background-color: #0056b3;
+        }
+
+        @media print {
+            .btn-print {
+                display: none;
+            }
+            body {
+                background-color: #fff;
+            }
+            .invoice-box {
+                box-shadow: none;
+                border: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="invoice-box">
+        <div class="header">
+            <div class="mall-details">
+                <h1>City Center Mall</h1>
+                <p>123 Shopping Avenue, Tech District</p>
+                <p>Phone: +1 234 567 890</p>
+                <p>Email: support@citycenter.com</p>
+            </div>
+            <div class="invoice-details">
+                <h2>INVOICE</h2>
+                <p><strong>Invoice #:</strong> 98234</p>
+                <p><strong>Date:</strong> 2026-01-12</p>
+                <p><strong>Time:</strong> 10:30:45 AM</p>
+            </div>
+        </div>
+
+        <div class="customer-info">
+            <strong>Bill To:</strong>
+            <span>Mr. Alex Johnson</span><br>
+            <span>Membership ID: M-8821</span><br>
+            <span>Phone: +1 987 654 3210</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th class="text-center">Sl No</th>
+                    <th>Item Description</th>
+                    <th class="text-center">Quantity</th>
+                    <th class="text-right">Unit Price</th>
+                    <th class="text-right">Net Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-center">1</td>
+                    <td>Wireless Gaming Mouse</td>
+                    <td class="text-center">1</td>
+                    <td class="text-right">$45.00</td>
+                    <td class="text-right">$45.00</td>
+                </tr>
+                <tr>
+                    <td class="text-center">2</td>
+                    <td>USB-C Charging Cable (2m)</td>
+                    <td class="text-center">2</td>
+                    <td class="text-right">$10.00</td>
+                    <td class="text-right">$20.00</td>
+                </tr>
+                <tr>
+                    <td class="text-center">3</td>
+                    <td>Mechanical Keyboard</td>
+                    <td class="text-center">1</td>
+                    <td class="text-right">$85.00</td>
+                    <td class="text-right">$85.00</td>
+                </tr>
+                <tr>
+                    <td class="text-center">4</td>
+                    <td>Screen Cleaning Kit</td>
+                    <td class="text-center">1</td>
+                    <td class="text-right">$5.00</td>
+                    <td class="text-right">$5.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="totals-section">
+            <table class="totals-table">
+                <tr>
+                    <td>Subtotal:</td>
+                    <td class="text-right">$155.00</td>
+                </tr>
+                <tr>
+                    <td>Tax (GST 10%):</td>
+                    <td class="text-right">$15.50</td>
+                </tr>
+                <tr class="grand-total">
+                    <td>Total Amount:</td>
+                    <td class="text-right">$170.50</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>Thank you for shopping with us!</p>
+            <p>Terms & Conditions Apply. Returns accepted within 7 days with original receipt.</p>
+        </div>
+    </div>
+
+    <button class="btn-print" onclick="window.print()">Print Invoice</button>
+
+</body>
+</html>
