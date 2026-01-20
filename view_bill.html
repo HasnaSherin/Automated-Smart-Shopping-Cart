@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>E-Bill Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            margin: 30px;
+            background: #f5f5f5;
+        }
+
+        .bill-container {
+            background: white;
+            padding: 20px;
+            max-width: 900px;
+            margin: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #ccc;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+
+        .totals {
+            text-align: right;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="bill-container">
+    <h2>User Bill</h2>
+
+    <p><b>Bill ID:</b> <span id="billId"></span></p>
+    <p><b>Date:</b> <span id="billDate"></span></p>
+    <p><b>Status:</b> <span id="status"></span></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Item Name</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+
+        <tbody id="itemsBody">
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <p><b>Subtotal:</b> ₹<span id="subtotal"></span></p>
+        <p><b>Tax:</b> ₹<span id="tax"></span></p>
+        <h3>Grand Total: ₹<span id="grand"></span></h3>
+    </div>
+
+</div>
+
+<script>
+
+const SUPABASE_URL = "https://qlxpuodlnnwadifqlivq.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFseHB1b2Rsbm53YWRpZnFsaXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzIyMTksImV4cCI6MjA4MTY0ODIxOX0.h9Adajfrlcxj1QgjMAUkpXKPbPaRRpxIEtpz-VEeJrQ";
+
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function loadBill() {
+
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+
+    if (!id) {
+        alert("No Bill ID Provided");
+        return;
+    }
+
+    document.getElementById("billId").innerText = id;
+
+    const { data, error } = await client
+        .from("billing")
+        .select("*")
+        .eq("bill_id", id)
+        .single();
+
+    if (error || !data) {
+        alert("Bill Not Found");
+        console.log(error);
+        return;
+    }
+
+    document.getElementById("billDate").innerText = data.created_at;
+    document.getElementById("status").innerText = data.payment_status;
+
+    document.getElementById("subtotal").innerText = data.subtotal;
+    document.getElementById("tax").innerText = data.tax_total;
+    document.getElementById("grand").innerText = data.grand_total;
+
+    let items = data.purchase_items;
+
+    if (typeof items === "string") {
+        items = JSON.parse(items);
+    }
+
+    let html = "";
+
+    items.forEach((item, index) => {
+        html += `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${item.name}</td>
+            <td>${item.quantity}</td>
+            <td>₹${item.price}</td>
+            <td>₹${item.price * item.quantity}</td>
+        </tr>`;
+    });
+
+    document.getElementById("itemsBody").innerHTML = html;
+}
+
+loadBill();
+
+</script>
+
+
+</body>
+</html>

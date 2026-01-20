@@ -19,7 +19,8 @@ class SmartCartApp(tk.Frame):
         
         self.cart_items = {}
         self.total = 0.0
-        self.tax_rate = 0.05
+        self.saved = 0.0
+        # self.tax_rate = 0.05
 
         self.fonts = {
             "header": font.Font(family="Helvetica", size=24, weight="bold"),
@@ -81,11 +82,12 @@ class SmartCartApp(tk.Frame):
         self.cart_frame.columnconfigure(0, weight=1)
         self.cart_frame.rowconfigure(0, weight=1)
 
-        columns = ("name", "quantity", "price", "total")
+        columns = ("name", "quantity", "price", "discount", "total")
         self.tree = ttk.Treeview(self.cart_frame, columns=columns, show="headings", height=12)
         self.tree.heading("name", text="PRODUCT NAME")
         self.tree.heading("quantity", text="QTY")
         self.tree.heading("price", text="UNIT PRICE")
+        self.tree.heading("discount", text="DISCOUNT")
         self.tree.heading("total", text="TOTAL")
         self.tree.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
@@ -99,8 +101,8 @@ class SmartCartApp(tk.Frame):
 
         self.subtotal_label = ttk.Label(totals_frame, text="Subtotal: ₹0.00", style='Totals.TLabel')
         self.subtotal_label.grid(row=0, column=0, sticky="w")
-        self.tax_label = ttk.Label(totals_frame, text="Tax (5%): ₹0.00", style='Totals.TLabel')
-        self.tax_label.grid(row=0, column=1, sticky="w")
+        self.saved_label = ttk.Label(totals_frame, text="You saved: ₹0.00", style='Totals.TLabel')
+        self.saved_label.grid(row=0, column=1, sticky="w")
         self.total_label = ttk.Label(totals_frame, text="Total: ₹0.00", style='GrandTotal.TLabel')
         self.total_label.grid(row=0, column=3, sticky="e")
 
@@ -141,7 +143,7 @@ class SmartCartApp(tk.Frame):
                 
                 # Look up product in DB
                 try:
-                    conn = sqlite3.connect('products.db')
+                    conn = sqlite3.connect('cart_database.db')
                     cursor = conn.cursor()
                     cursor.execute("SELECT name, price FROM products WHERE barcode=?", (barcode_data,))
                     product = cursor.fetchone()
@@ -176,13 +178,13 @@ class SmartCartApp(tk.Frame):
         try:
             conn = sqlite3.connect('cart_database.db')
             cursor = conn.cursor()
-            cursor.execute("SELECT barcode, product_name, mrp FROM products ORDER BY RANDOM() LIMIT 1")
+            cursor.execute("SELECT barcode, product_name, mrp, discount FROM products ORDER BY RANDOM() LIMIT 1")
             product = cursor.fetchone()
             conn.close()
 
             if product:
-                barcode, product_name, price = product
-                self.add_item(barcode, product_name, price)
+                barcode, product_name, price, discount = product
+                self.add_item(barcode, product_name, price, discount)
                 self.update_status(f"Scanned: {product_name}")
             else:
                 self.update_status("Database is empty. No item to scan.", "error")
@@ -198,11 +200,11 @@ class SmartCartApp(tk.Frame):
         # For now, we simulate a DB hit
         self.add_item(barcode, f"Item-{barcode}", 100.0)
 
-    def add_item(self, barcode, name, price):
+    def add_item(self, barcode, name, price, discount):
         if barcode in self.cart_items:
             self.cart_items[barcode]['quantity'] += 1
         else:
-            self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1}
+            self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1, 'discount' : discount}
         self._update_cart_display()
         self.status_bar.config(text=f"Added: {name}")
 
@@ -223,8 +225,10 @@ class SmartCartApp(tk.Frame):
     def _update_cart_display(self):
         for i in self.tree.get_children(): self.tree.delete(i)
         for code, item in self.cart_items.items():
-            total = item['price'] * item['quantity']
-            self.tree.insert("", "end", values=(item['name'], item['quantity'], f"₹{item['price']}", f"₹{total}"))
+            sub_total = item['price'] * item['quantity']
+            discount = round((item['price'] * (item['discount'] / 100)) * item['quantity'], 2)
+            total = sub_total - discount
+            self.tree.insert("", "end", values=(item['name'], item['quantity'], f"₹{item['price']}", f"₹{discount}", f"₹{total}"))
         self._update_totals()
         self._toggle_cart_view()
 
@@ -236,12 +240,18 @@ class SmartCartApp(tk.Frame):
             self.empty_cart_label.grid_remove()
             self.cart_frame.grid()
 
+    # Bottom config
     def _update_totals(self):
         self.subtotal = sum(i['price'] * i['quantity'] for i in self.cart_items.values())
-        self.tax = self.subtotal * self.tax_rate
-        self.total = self.subtotal + self.tax
+        # self.tax = self.subtotal * self.tax_rate
+        # self.total = self.subtotal + self.tax
+        self.discount = sum((i['price'] * (i['discount'] / 100)) * i['quantity'] for i in self.cart_items.values())
+        self.total = self.subtotal - self.discount
+        self.saved = self.discount
+        
         self.subtotal_label.config(text=f"SUBTOTAL: ₹{self.subtotal:.2f}")
-        self.tax_label.config(text=f"TAX (5%): ₹{self.tax:.2f}")
+        # self.tax_label.config(text=f"TAX (5%): ₹{self.tax:.2f}")
+        self.saved_label.config(text=f"YOU SAVED: ₹{self.saved:.2f}")
         self.total_label.config(text=f"TOTAL: ₹{self.total:.2f}")
         
         
@@ -253,22 +263,44 @@ class SmartCartApp(tk.Frame):
             self.status_bar.config(background=THEME["success"], foreground="white")
         else:
             self.status_bar.config(background=THEME["primary"], foreground="white")
+    
+    
+    def checkout(self):
+        """Handles the checkout process with confirmation."""
+        if not self.cart_items:
+            messagebox.showwarning("Empty", "Your cart is empty. Please scan items to checkout.")
+            return
+
+        checkout_message = f"Your total bill is ₹{self.total:.2f}.\n\nWould you like to proceed to login and finish your order?"
+
+        confirm = messagebox.askokcancel("Confirm Checkout", checkout_message)
+
+        if confirm:
+            self.controller.shared_data["cart_items"] = self.cart_items
+            self.controller.shared_data["cart_total"] = self.total
+            self.controller.shared_data["pending_checkout"] = True
+
+            self.update_status("Redirecting to Login...", "success")
             
+            self.controller.show_frame("AuthApp")
+        else:
+            self.update_status("Checkout paused.", "info")
+
     
 
-    def checkout(self):
-        if not self.cart_items:
-            messagebox.showwarning("Empty", "Cart is empty!")
-            return
+    # def checkout(self):
+    #     if not self.cart_items:
+    #         messagebox.showwarning("Empty", "Cart is empty!")
+    #         return
         
-        checkout_message = f"Your total bill is ₹{self.total:.2f}.\n\nThank you for shopping with us!"
-        messagebox.showinfo("Checkout Successful", checkout_message)
-        self.update_status("Checkout complete! Thank you.", "success")
+    #     checkout_message = f"Your total bill is ₹{self.total:.2f}.\n\nThank you for shopping with us!"
+    #     messagebox.showinfo("Checkout Successful", checkout_message)
+    #     self.update_status("Checkout complete! Thank you.", "success")
         
-        # --- CRITICAL: PASS DATA TO CONTROLLER ---
-        self.controller.shared_data["cart_items"] = self.cart_items
-        self.controller.shared_data["cart_total"] = self.total
-        self.controller.shared_data["pending_checkout"] = True
+    #     # --- CRITICAL: PASS DATA TO CONTROLLER ---
+    #     self.controller.shared_data["cart_items"] = self.cart_items
+    #     self.controller.shared_data["cart_total"] = self.total
+    #     self.controller.shared_data["pending_checkout"] = True
         
-        # Switch to Auth for payment/verification
-        self.controller.show_frame("AuthApp")
+    #     # Switch to Auth for payment/verification
+    #     self.controller.show_frame("AuthApp")

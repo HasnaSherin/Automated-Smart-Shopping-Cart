@@ -7,7 +7,6 @@ def setup_database():
         cursor = conn.cursor()
 
         
-       
         # Create users table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -64,16 +63,16 @@ def setup_database():
 
         # Sample data
         products = [
-        ('8901057512345', 'Aashirvaad Atta', 350, 5, 5, 5, 'kg', 60, 15),
-        ('8901725187654', 'Sunflower Oil', 180, 3, 5, 1, 'L', 45, 10),
-        ('8901302009876', 'Nescafe Coffee', 290, 8, 12, 100, 'g', 35, 8),
-        ('8901491198765', 'Dettol Liquid', 85, 4, 12, 250, 'ml', 70, 15),
+        ('8901057512345', 'Aashirvaad Atta', 350, 20, 5, 5, 'kg', 60, 15),
+        ('8901725187654', 'Sunflower Oil', 180, 30, 5, 1, 'L', 45, 10),
+        ('8901302009876', 'Nescafe Coffee', 290, 18, 12, 100, 'g', 35, 8),
+        ('8901491198765', 'Dettol Liquid', 85, 14, 12, 250, 'ml', 70, 15),
         ('8906003012345', 'Himalaya Soap', 45, 0, 5, 75, 'g', 120, 25),
-        ('8901719101122', 'Bru Coffee', 240, 6, 12, 200, 'g', 40, 10),
-        ('8901526709988', 'Dove Soap', 55, 2, 5, 100, 'g', 95, 20),
-        ('7501031312345', 'Sprite Bottle', 45, 0, 12, 500, 'ml', 85, 20),
-        ('8901725198760', 'Kissan Jam', 140, 5, 12, 500, 'g', 50, 12),
-        ('8906003098765', 'Pears Soap', 60, 3, 5, 125, 'g', 65, 15)
+        ('8901719101122', 'Bru Coffee', 240, 16, 12, 200, 'g', 40, 10),
+        ('8901526709988', 'Dove Soap', 55, 20, 5, 100, 'g', 95, 20),
+        ('7501031312345', 'Sprite Bottle', 45, 0.5, 12, 500, 'ml', 85, 20),
+        ('8901725198760', 'Kissan Jam', 140, 50, 12, 500, 'g', 50, 12),
+        ('8906003098765', 'Pears Soap', 60, 30, 5, 125, 'g', 65, 15)
     ]
 
         # Insert data, ignore if barcode already exists
@@ -136,4 +135,3 @@ def setup_database():
 
 if __name__ == '__main__':
     setup_database()
-              
