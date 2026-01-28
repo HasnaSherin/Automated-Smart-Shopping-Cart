@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, font
+import winsound
 import cv2
 from pyzbar.pyzbar import decode
 import sqlite3
@@ -123,12 +124,12 @@ class SmartCartApp(tk.Frame):
 
     #Scan with Camera
     def scan_with_camera(self):
-        self.update_status("Opening camera... Please show a barcode.")
-        cap = cv2.VideoCapture(0) # Standard index is 0, changed from 1 for general compatibility
+        self.update_status("Opening scanner... Please show a barcode.")
+        cap = cv2.VideoCapture(1) # Standard index is 0, changed from 1 for general compatibility
         
         if not cap.isOpened():
-            messagebox.showerror("Camera Error", "Could not open webcam.")
-            self.update_status("Failed to open camera.", "error")
+            messagebox.showerror("Scanner Error", "Could not open the scanner.")
+            self.update_status("Failed to scan the barcode.", "error")
             return
 
         found_barcode = False
@@ -140,24 +141,32 @@ class SmartCartApp(tk.Frame):
             for barcode in decode(img):
                 barcode_data = barcode.data.decode('utf-8')
                 self.update_status(f"Barcode found: {barcode_data}")
+                last_barcode = barcode_data
+                
+                if barcode_data != last_barcode:
+                    print(f"Scanned: {barcode_data}")
+                    winsound.Beep(1000, 200) 
+                    last_barcode = barcode_data
                 
                 # Look up product in DB
                 try:
                     conn = sqlite3.connect('cart_database.db')
                     cursor = conn.cursor()
-                    cursor.execute("SELECT name, price FROM products WHERE barcode=?", (barcode_data,))
+                    cursor.execute("SELECT barcode, product_name, mrp, discount, quantity_value, quantity_unit FROM products WHERE barcode=?", (barcode_data,))
                     product = cursor.fetchone()
                     conn.close()
 
                     if product:
-                        name, price = product
-                        self.add_item(barcode_data, name, price)
-                        self.update_status(f"Added: {name}")
+                        barcode, product_name, price, discount, quantity_value, quantity_unit = product
+                        self.add_item(barcode, product_name, price, discount, quantity_value, quantity_unit)
+                        self.update_status(f"Scanned: {product_name}")
+                        
                     else:
                         self.update_status(f"Barcode {barcode_data} not found in database.", "error")
                     
                     found_barcode = True
                     break # Exit inner loop
+                
                 except sqlite3.Error as e:
                     self.update_status(f"Database error: {e}", "error")
 
@@ -178,13 +187,13 @@ class SmartCartApp(tk.Frame):
         try:
             conn = sqlite3.connect('cart_database.db')
             cursor = conn.cursor()
-            cursor.execute("SELECT barcode, product_name, mrp, discount FROM products ORDER BY RANDOM() LIMIT 1")
+            cursor.execute("SELECT barcode, product_name, mrp, discount, quantity_value, quantity_unit FROM products ORDER BY RANDOM() LIMIT 1")
             product = cursor.fetchone()
             conn.close()
 
             if product:
-                barcode, product_name, price, discount = product
-                self.add_item(barcode, product_name, price, discount)
+                barcode, product_name, price, discount, quantity_value, quantity_unit = product
+                self.add_item(barcode, product_name, price, discount, quantity_value, quantity_unit)
                 self.update_status(f"Scanned: {product_name}")
             else:
                 self.update_status("Database is empty. No item to scan.", "error")
@@ -195,16 +204,16 @@ class SmartCartApp(tk.Frame):
             # self.create_mock_db()
 
 
-    def add_item_from_db(self, barcode):
-        # In a real app, query SQLite here
-        # For now, we simulate a DB hit
-        self.add_item(barcode, f"Item-{barcode}", 100.0)
+    # def add_item_from_db(self, barcode):
+    #     # In a real app, query SQLite here
+    #     # For now, we simulate a DB hit
+    #     self.add_item(barcode, f"Item-{barcode}", 100.0)
 
-    def add_item(self, barcode, name, price, discount):
+    def add_item(self, barcode, name, price, discount, quantity_value, quantity_unit):
         if barcode in self.cart_items:
             self.cart_items[barcode]['quantity'] += 1
         else:
-            self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1, 'discount' : discount}
+            self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1, 'discount' : discount, 'quantity_value': quantity_value, 'quantity_unit': quantity_unit}
         self._update_cart_display()
         self.status_bar.config(text=f"Added: {name}")
 
@@ -246,13 +255,13 @@ class SmartCartApp(tk.Frame):
         # self.tax = self.subtotal * self.tax_rate
         # self.total = self.subtotal + self.tax
         self.discount = sum((i['price'] * (i['discount'] / 100)) * i['quantity'] for i in self.cart_items.values())
-        self.total = self.subtotal - self.discount
+        self.grand_total = self.subtotal - self.discount
         self.saved = self.discount
         
         self.subtotal_label.config(text=f"SUBTOTAL: ₹{self.subtotal:.2f}")
         # self.tax_label.config(text=f"TAX (5%): ₹{self.tax:.2f}")
         self.saved_label.config(text=f"YOU SAVED: ₹{self.saved:.2f}")
-        self.total_label.config(text=f"TOTAL: ₹{self.total:.2f}")
+        self.total_label.config(text=f"TOTAL: ₹{self.grand_total:.2f}")
         
         
     def update_status(self, message, level="info"):
@@ -271,13 +280,13 @@ class SmartCartApp(tk.Frame):
             messagebox.showwarning("Empty", "Your cart is empty. Please scan items to checkout.")
             return
 
-        checkout_message = f"Your total bill is ₹{self.total:.2f}.\n\nWould you like to proceed to login and finish your order?"
+        checkout_message = f"Your total bill is ₹{self.grand_total:.2f}.\n\nWould you like to proceed to login and finish your order?"
 
         confirm = messagebox.askokcancel("Confirm Checkout", checkout_message)
 
         if confirm:
             self.controller.shared_data["cart_items"] = self.cart_items
-            self.controller.shared_data["cart_total"] = self.total
+            self.controller.shared_data["cart_info"] = {"grand_total": self.grand_total, "subtotal": self.subtotal, "total_discount": self.saved}
             self.controller.shared_data["pending_checkout"] = True
 
             self.update_status("Redirecting to Login...", "success")

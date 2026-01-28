@@ -1,3 +1,4 @@
+from enum import verify
 import tkinter as tk
 from tkinter import font, messagebox
 import sqlite3
@@ -9,7 +10,7 @@ load_dotenv()
 
 THEME = {
     "bg": "#101622", "card": "#151a25", "primary": "#135bec",
-    "primary_hover": "#2563eb", "white": "#ffffff", "gray": "#92a4c9"
+    "primary_hover": "#2563eb", "white": "#ffffff", "gray": "#92a4c9" 
 }
 
 class AuthApp(tk.Frame):
@@ -17,6 +18,8 @@ class AuthApp(tk.Frame):
         super().__init__(parent)
         self.controller = controller # This is MainApp
         self.configure(bg=THEME["bg"])
+        self.url = os.getenv("SUPABASE_URL")
+        self.key = os.getenv("SUPABASE_KEY")
         
         # CHANGED: Renamed to shared_data to match what sub-pages expect
         self.shared_data = {"email": "", "username": "", "mobile": ""}
@@ -158,30 +161,51 @@ class RegisterPage(tk.Frame):
             # Update Global MainApp Data
             self.controller.controller.shared_data["user_info"]["name"] = username
             self.controller.controller.shared_data["user_info"]["phone"] = mobile
-            total_amount = main_app.shared_data["cart_total"]
+            total_amount = main_app.shared_data["cart_info"].get("grand_total", 0.0)
             user_data = (mobile, username, email, mobile, "NULL", "NULL", total_amount, "NULL", "NULL", "0", "2025-12-23 19:21:06.361401+00")
                         
             try:
                 conn = sqlite3.connect("cart_database.db")
                 cursor = conn.cursor()
-                
-                # Save username and mobile number to the database
+                url = os.getenv("SUPABASE_URL")
+                key = os.getenv("SUPABASE_KEY")
+                supabase = create_client(url, key)
+
                 cursor.execute("""
                     INSERT INTO users
                         (id, username, email, phone_no, last_time_spend, avg_time, last_spend, avg_spend,
                         last_purchase, total_purchase, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, user_data)    
+                        """, user_data)
                 conn.commit()
                 conn.close()
+                currentDate = datetime.datetime.now()
+                user_info = {"id": mobile, "username": username,"email": email, "phoneNumber": mobile, "last_purchase": str(currentDate)}
+                response = supabase.table("users").insert(user_info).execute()
+                if response:
+                    print("User registered in Supabase.")
+                    response = supabase.auth.sign_in_with_otp(
+                        {
+                            "email": email,
+                            "options": {
+                                "should_create_user": True,
+                            },
+                        }
+                    )
+                    
+                    print("OTP sent! Please check your email.")
+                
+                    if response:
+                        messagebox.showinfo("Registration", "Details saved. Proceeding to OTP verification.")
+                        self.controller.show_internal("OTPPage")
+                    
+                
+                # supabase.table("users").insert(user_data).execute()
                 
             except sqlite3.Error as e:
                 messagebox.showerror("DB Error", str(e))
                 self.controller.show_internal("RegisterPage")
-            messagebox.showinfo("Registration", "Details saved. Proceeding to OTP verification.")
-            
-            # FIXED: Call show_internal instead of show_frame
-            self.controller.show_internal("OTPPage")
+           
         else:
             messagebox.showwarning("Input Error", "All fields are required.")
 
@@ -210,11 +234,49 @@ class OTPPage(tk.Frame):
         # For simplicity, we proceed to welcome
         main_app = self.controller.controller
         otp = self.otp_entry.get().strip()
-        if otp == "1234":
-            main_app.shared_data["pending_checkout"] = True
-            self.controller.show_internal("WelcomePage")
-        else: 
-            messagebox.askretrycancel("Invalid OTP", "Please enter the valid otp")
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
+        try:
+            supabase = create_client(url, key)
+            try:
+                response = supabase.auth.verify_otp({
+                    'email': main_app.shared_data["user_info"]["email"],
+                    'token': otp,
+                    'type': 'email',
+                })
+                # If successful, response.session will contain the access_token
+                if response.session:
+                    main_app.shared_data["pending_checkout"] = True
+                    self.controller.show_internal("WelcomePage")
+                else:
+                    messagebox.showerror("OTP Error", "Invalid or expired OTP.")
+                
+            except Exception as e:
+                print("DEBUG ERROR:", repr(e))
+                
+        except Exception as e:
+            print(f"Supabase Connection Error: {e}")
+        # if otp == "1234":
+        #     main_app.shared_data["pending_checkout"] = True
+        #     self.controller.show_internal("WelcomePage")
+        # else: 
+        #     messagebox.askretrycancel("Invalid OTP", "Please enter the valid otp")
+            
+    # def verify_otp(email, token):
+    # """Step 2: Verify the OTP to create a session"""
+    # try:
+    #     response = supabase.auth.verify_otp({
+    #         'email': email,
+    #         'token': token,
+    #         'type': 'email',
+    #     })
+    #     # If successful, response.session will contain the access_token
+    #     if response.session:
+    #         return True, response.user
+    #     else:
+    #         return False, "Invalid or expired OTP."
+    # except Exception as e:
+    #     return False, repr(e)
 
 class WelcomePage(tk.Frame):
     def __init__(self, parent, controller):
@@ -235,22 +297,29 @@ class WelcomePage(tk.Frame):
     def on_show(self):
         main_app = self.controller.controller
         if main_app.shared_data.get("pending_checkout"):
-            self.save_order(main_app)
-            user = main_app.shared_data["user_info"].get("name", "User")
-            self.header.config(text=f"Welcome, {user}")
-            self.msg.config(text="Authentication Successful.")
+            saved = self.save_order(main_app)
+            if saved:
+                user = main_app.shared_data["user_info"].get("name", "User")
+                self.header.config(text=f"Welcome, {user}")
+                self.msg.config(text="Authentication Successful.")
+            else:
+                self.header.config(text="Error", fg="red")
+                self.msg.config(text="Failed to save order.")
             
         else:
             user = main_app.shared_data["user_info"].get("name", "User")
             self.header.config(text=f"Welcome, {user}")
             self.msg.config(text="Authentication Successful.")
             
+            
     def save_order(self, main_app):
-        cart = main_app.shared_data["cart_items"]
-        total_amount = main_app.shared_data["cart_total"]
+        cart = main_app.shared_data["cart_items"].items()
         email = main_app.shared_data["user_info"].get("email", "Guest")
         username = main_app.shared_data["user_info"].get("name", "User")
         mobile = main_app.shared_data["user_info"].get("phone", "0000000000")
+        subtotal = main_app.shared_data["cart_info"].get("subtotal", 0.0)
+        total_discount = main_app.shared_data["cart_info"].get("total_discount")
+        total_amount = main_app.shared_data["cart_info"].get("grand_total")
         currentDate = datetime.datetime.now()
         print(currentDate)
         
@@ -260,36 +329,94 @@ class WelcomePage(tk.Frame):
         # total_amount = "1234"
         
         try:
-            user_data = (mobile, username, email, mobile, "NULL", "NULL", total_amount, "NULL", "NULL", "0", currentDate)
-            print(user_data)
-            conn = sqlite3.connect("cart_database.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO users
-                    (id, username, email, phone_no, last_time_spend, avg_time, last_spend, avg_spend,
-                    last_purchase, total_purchase, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, user_data)    
-            conn.commit()
-            conn.close()
+            # user_data = (mobile, username, email, mobile, "NULL", "NULL", total_amount, "NULL", "NULL", "0", str(currentDate))
+            # print(user_data)
             # conn = sqlite3.connect("cart_database.db")
-            # cur = conn.cursor()
-            # # cur.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY, email TEXT, total REAL)")
-            # cur.execute("INSERT INTO billing (email, total) VALUES (?, ?)", (email, total_amount))
+            # cursor = conn.cursor()
+            # cursor.execute("""
+            #     INSERT INTO users
+            #         (id, username, email, phone_no, last_time_spend, avg_time, last_spend, avg_spend,
+            #         last_purchase, total_purchase, created_at)
+            #         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            #         """, user_data)    
             # conn.commit()
+            print("User data inserted into SQLite database.\nInitialised Supabase insertion...")
+            url = os.getenv("SUPABASE_URL")
+            key = os.getenv("SUPABASE_KEY")
+            try:
+                # Convert cart dict to list for JSONB storage in Supabase
+                items_list = []
+
+                for barcode, item in cart:
+                    items_list.append({
+                        "barcode": barcode,
+                        "name": item["name"],
+                        "quantity": item["quantity"],
+                        "price": item["price"]
+                    })
+                
+                supabase = create_client(url, key)
+                # 1. Insert into Supabase table
+                # user_info = {"id": mobile, "username": username,"email": email, "phoneNumber": mobile, "last_purchase": str(currentDate)}
+                # response = supabase.table("users").insert(user_info).execute()
+                
+                bill = {"user_id": mobile, "purchase_items": items_list, "subtotal": subtotal, "total_discount": total_discount, "grand_total": total_amount, "payment_status": "Paid"}
+                response = supabase.table("billing").insert(bill).execute()
+                
+                bill_id = response.data[0]['bill_id']
+                data = {"bill_id": bill_id, "user_id": mobile, "cart_id": "A101", "total_amount": total_amount, "payment_status": "Paid"}
+                response = supabase.table("orders").insert(data).execute()
+                
+                # 2. Extract the unique ID for the link
+                # order_uuid = response.data[0]['bill_id']
+
+                # 3. This link triggers the Edge Function to render bill.html
+                bill_url = f"http://127.0.0.1:5500/modified/view-bill.html?id={bill_id}"
+
+                self.header.config(text="Order Successful!")
+                self.msg.config(text=f"Bill link generated for {mobile}")
+                print(f"Generated Bill Link: {bill_url}")
+                
+                self.header.config(text="Order Placed!")
+                self.msg.config(text=f"Amount ₹{total_amount:.2f} billed to {email}")
+                
+        
+                
+            except Exception as e:
+                print(f"Supabase Connection Error: {e}")
+                self.header.config(text="Error", fg="red")
+                self.msg.config(text=f"Supabase Error: {e}")
+                return False
+            
+            # print(main_app.shared_data["cart_items"])
+            # print(main_app.shared_data["user_info"])
+            # print(main_app.shared_data["cart_total"])
+            print("Successfully check out - Supabase code commented out for now.")
+
+            
+            # items_list = [
+            #     {"barcode": barcode, "name": item['name'], "quantity": item['quantity'], "price": item['price']}
+            #     for barcode, item in main_app.shared_data["cart_items"].values()
+            # ]
+            # print(items_list)
+            
+            # mobile = main_app.shared_data["user_info"].get("mobile")
+            # total = main_app.shared_data["cart_total"]
+
+            # try:
+                
+            
+            # except Exception as e:
+            #     self.header.config(text="Error", fg="red")
+            #     self.msg.config(text=f"Supabase Error: {e}")
+                
             # conn.close()
-            
-            self.header.config(text="Order Placed!")
-            self.msg.config(text=f"Amount ₹{total_amount:.2f} billed to {email}")
-            
-            # Reset Cart
-            main_app.shared_data["pending_checkout"] = False
-            main_app.shared_data["cart_items"] = {}
-            main_app.shared_data["cart_total"] = 0.0
             
         except Exception as e:
             self.header.config(text="Error", fg="red")
             self.msg.config(text=str(e))
+            
+        return True
 
 
     # def save_order(self, main_app):
@@ -347,4 +474,8 @@ class WelcomePage(tk.Frame):
 
 
     def finish(self):
+        # Reset Cart
+        self.controller.controller.shared_data["pending_checkout"] = False
+        self.controller.controller.shared_data["cart_items"] = {}
+        self.controller.controller.shared_data["cart_info"] = {}
         self.controller.controller.show_frame("WelcomeScreen")
