@@ -72,7 +72,13 @@ def setup_database():
         ('8901526709988', 'Dove Soap', 55, 20, 5, 100, 'g', 95, 20),
         ('7501031312345', 'Sprite Bottle', 45, 0.5, 12, 500, 'ml', 85, 20),
         ('8901725198760', 'Kissan Jam', 140, 50, 12, 500, 'g', 50, 12),
-        ('8906003098765', 'Pears Soap', 60, 30, 5, 125, 'g', 65, 15)
+        ('8906003098765', 'Pears Soap', 60, 30, 5, 125, 'g', 65, 15),
+        ('8901058009439', 'Nestle Munch', 5, 10, 5, 10.4, 'g', 100, 20),
+        ('8906016491738', 'Elite premium milk rusk', 35, 12, 5, 182, 'g', 80, 15),
+        ('8901030538421', 'Vim dishwash liquid', 25, 8, 12, 200, 'ml', 60, 10),
+        ('8914129764182', 'Island healthy desert', 5, 5, 5, 14, 'g', 50, 10),
+        ('0736649746503', 'Souhridham peanut', 40, 10, 5, 130, 'g', 70, 15),
+        ('8909081008429', 'Sunfeast Yippee! Noodles', 60, 15, 12, 290.4, 'g', 90, 20)
     ]
 
         # Insert data, ignore if barcode already exists
