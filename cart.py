@@ -1,3 +1,4 @@
+from itertools import product
 import tkinter as tk
 from tkinter import ttk, messagebox, font
 import winsound
@@ -157,9 +158,11 @@ class SmartCartApp(tk.Frame):
                     conn.close()
 
                     if product:
-                        barcode, product_name, price, discount, quantity_value, quantity_unit = product
-                        self.add_item(barcode, product_name, price, discount, quantity_value, quantity_unit)
-                        self.update_status(f"Scanned: {product_name}")
+                        ProductPopup(self, product, self.confirm_add_item)
+                        self.update_status(f"Previewing: {product[1]}")
+                        # barcode, product_name, price, discount, quantity_value, quantity_unit = product
+                        # self.add_item(barcode, product_name, price, discount, quantity_value, quantity_unit)
+                        # self.update_status(f"Scanned: {product_name}")
                         
                     else:
                         self.update_status(f"Barcode {barcode_data} not found in database.", "error")
@@ -192,30 +195,47 @@ class SmartCartApp(tk.Frame):
             conn.close()
 
             if product:
-                barcode, product_name, price, discount, quantity_value, quantity_unit = product
-                self.add_item(barcode, product_name, price, discount, quantity_value, quantity_unit)
-                self.update_status(f"Scanned: {product_name}")
+                ProductPopup(self, product, self.confirm_add_item)
+                self.update_status(f"Previewing: {product[1]}")
+                # barcode, product_name, price, discount, quantity_value, quantity_unit = product
+                # self.add_item(barcode, product_name, price, discount, quantity_value, quantity_unit)
+                # self.update_status(f"Scanned: {product_name}")
             else:
                 self.update_status("Database is empty. No item to scan.", "error")
         except sqlite3.Error as e:
             self.update_status(f"Database error: {e}", "error")
-            # Create a mock DB if it doesn't exist for testing purposes
             messagebox.showinfo("Info", "Error accessing database.")
-            # self.create_mock_db()
 
 
-    # def add_item_from_db(self, barcode):
-    #     # In a real app, query SQLite here
-    #     # For now, we simulate a DB hit
-    #     self.add_item(barcode, f"Item-{barcode}", 100.0)
 
-    def add_item(self, barcode, name, price, discount, quantity_value, quantity_unit):
+    def confirm_add_item(self, product_data, quantity):
+        """Callback from popup to finalise the addition"""
+        barcode, product_name, price, discount, quantity_value, quantity_unit = product_data
+        self.add_item(barcode, product_name, price, discount, quantity_value, quantity_unit, quantity)
+
+    def add_item(self, barcode, name, price, discount, quantity_value, quantity_unit, quantity=1):
         if barcode in self.cart_items:
-            self.cart_items[barcode]['quantity'] += 1
+            self.cart_items[barcode]['quantity'] += quantity
         else:
-            self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1, 'discount' : discount, 'quantity_value': quantity_value, 'quantity_unit': quantity_unit}
+            self.cart_items[barcode] = {
+                'name': name, 
+                'price': price, 
+                'quantity': quantity, 
+                'discount': discount, 
+                'quantity_value': quantity_value, 
+                'quantity_unit': quantity_unit
+            }
         self._update_cart_display()
-        self.status_bar.config(text=f"Added: {name}")
+        self.update_status(f"Added {quantity}x {name}", "success")
+    
+    
+    # def add_item(self, barcode, name, price, discount, quantity_value, quantity_unit):
+    #     if barcode in self.cart_items:
+    #         self.cart_items[barcode]['quantity'] += 1
+    #     else:
+    #         self.cart_items[barcode] = {'name': name, 'price': price, 'quantity': 1, 'discount' : discount, 'quantity_value': quantity_value, 'quantity_unit': quantity_unit}
+    #     self._update_cart_display()
+    #     self.status_bar.config(text=f"Added: {name}")
 
     def remove_item(self):
         selected = self.tree.selection()
@@ -313,3 +333,68 @@ class SmartCartApp(tk.Frame):
         
     #     # Switch to Auth for payment/verification
     #     self.controller.show_frame("AuthApp")
+    
+    
+class ProductPopup(tk.Toplevel):
+    def __init__(self, parent, product_data, callback):
+        super().__init__(parent)
+        self.title("Product Scanned")
+        self.geometry("400x450")
+        self.configure(bg=THEME["card"])
+        self.resizable(False, False)
+        
+        # Make it a modal window
+        self.transient(parent)
+        self.grab_set()
+        
+        self.product_data = product_data # (barcode, name, price, discount, qty_val, qty_unit)
+        self.callback = callback
+        self.quantity = tk.IntVar(value=1)
+
+        # UI
+        tk.Label(self, text="ITEM SCANNED", bg=THEME["card"], fg=THEME["primary"], font=("Helvetica", 12, "bold")).pack(pady=20)
+        
+        # Product Name
+        tk.Label(self, text=product_data[1], bg=THEME["card"], fg="white", font=("Helvetica", 18, "bold"), wraplength=350).pack()
+        
+        # Product Price info
+        mrp = product_data[2]
+        disc = product_data[3]
+        final_price = round(mrp - (mrp * disc/100), 2)
+        tk.Label(self, text=f"Price: ₹{final_price} (MRP: ₹{mrp})", bg=THEME["card"], fg=THEME["gray"], font=("Helvetica", 11)).pack(pady=5)
+
+        # Quantity Selector
+        qty_frame = tk.Frame(self, bg=THEME["card"])
+        qty_frame.pack(pady=30)
+
+        tk.Button(qty_frame, text="−", font=("Arial", 18, "bold"), width=3, bg=THEME["bg"], fg="white", 
+                  relief="flat", command=self.decrement).grid(row=0, column=0)
+        
+        self.qty_lbl = tk.Label(qty_frame, textvariable=self.quantity, font=("Arial", 22, "bold"), bg=THEME["card"], fg="white", width=4)
+        self.qty_lbl.grid(row=0, column=1, padx=10)
+
+        tk.Button(qty_frame, text="+", font=("Arial", 18, "bold"), width=3, bg=THEME["bg"], fg="white", 
+                  relief="flat", command=self.increment).grid(row=0, column=2)
+
+        # Buttons
+        btn_frame = tk.Frame(self, bg=THEME["card"])
+        btn_frame.pack(pady=20, side="bottom", fill="x")
+
+        tk.Button(btn_frame, text="CANCEL", font=("Helvetica", 10, "bold"), bg=THEME["danger"], fg="white", 
+                  relief="flat", width=15, pady=10, command=self.destroy).pack(side="left", padx=20, pady=20)
+        
+        tk.Button(btn_frame, text="ADD TO CART", font=("Helvetica", 10, "bold"), bg=THEME["success"], fg="white", 
+                  relief="flat", width=15, pady=10, command=self.add_and_close).pack(side="right", padx=20, pady=20)
+
+    def increment(self):
+        self.quantity.set(self.quantity.get() + 1)
+
+    def decrement(self):
+        if self.quantity.get() > 1:
+            self.quantity.set(self.quantity.get() - 1)
+
+    def add_and_close(self):
+        # Call back to main app with quantity
+        self.callback(self.product_data, self.quantity.get())
+        print(self.quantity.get(),self.product_data)
+        self.destroy()

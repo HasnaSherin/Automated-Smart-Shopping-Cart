@@ -166,9 +166,9 @@ class RegisterPage(tk.Frame):
             try:
                 conn = sqlite3.connect("cart_database.db")
                 cursor = conn.cursor()
-                url = os.getenv("SUPABASE_URL")
-                key = os.getenv("SUPABASE_KEY")
-                supabase = create_client(url, key)
+                # url = os.getenv("SUPABASE_URL")
+                # key = os.getenv("SUPABASE_KEY")
+                # supabase = create_client(url, key)
 
                 cursor.execute("""
                     INSERT INTO users
@@ -178,27 +178,27 @@ class RegisterPage(tk.Frame):
                         """, user_data)
                 conn.commit()
                 conn.close()
-                currentDate = datetime.datetime.now()
-                user_info = {"id": mobile, "username": username,"email": email, "phoneNumber": mobile, "last_purchase": str(currentDate)}
-                response = supabase.table("users").insert(user_info).execute()
-                if response:
-                    print("User registered in Supabase.")
-                    response = supabase.auth.sign_in_with_otp(
-                        {
-                            "email": email,
-                            "options": {
-                                "should_create_user": True,
-                            },
-                        }
-                    )
+                # currentDate = datetime.datetime.now()
+                # user_info = {"id": mobile, "username": username,"email": email, "phoneNumber": mobile, "last_purchase": str(currentDate)}
+                # response = supabase.table("users").insert(user_info).execute()
+                # if response:
+                #     print("User registered in Supabase.")
+                #     response = supabase.auth.sign_in_with_otp(
+                #         {
+                #             "email": email,
+                #             "options": {
+                #                 "should_create_user": True,
+                #             },
+                #         }
+                #     )
                     
-                    print("OTP sent! Please check your email.")
+                #     print("OTP sent! Please check your email.")
                 
-                    if response:
-                        messagebox.showinfo("Registration", "Details saved. Proceeding to OTP verification.")
-                        self.controller.show_internal("OTPPage")
+                #     if response:
+                #         messagebox.showinfo("Registration", "Details saved. Proceeding to OTP verification.")
+                #         self.controller.show_internal("OTPPage")
                     
-                
+                self.controller.show_internal("OTPPage")
                 # supabase.table("users").insert(user_data).execute()
                 
             except sqlite3.Error as e:
@@ -233,33 +233,33 @@ class OTPPage(tk.Frame):
         # For simplicity, we proceed to welcome
         main_app = self.controller.controller
         otp = self.otp_entry.get().strip()
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        try:
-            supabase = create_client(url, key)
-            try:
-                response = supabase.auth.verify_otp({
-                    'email': main_app.shared_data["user_info"]["email"],
-                    'token': otp,
-                    'type': 'email',
-                })
-                # If successful, response.session will contain the access_token
-                if response.session:
-                    main_app.shared_data["pending_checkout"] = True
-                    self.controller.show_internal("WelcomePage")
-                else:
-                    messagebox.showerror("OTP Error", "Invalid or expired OTP.")
+        # url = os.getenv("SUPABASE_URL")
+        # key = os.getenv("SUPABASE_KEY")
+        # try:
+        #     supabase = create_client(url, key)
+        #     try:
+        #         response = supabase.auth.verify_otp({
+        #             'email': main_app.shared_data["user_info"]["email"],
+        #             'token': otp,
+        #             'type': 'email',
+        #         })
+        #         # If successful, response.session will contain the access_token
+        #         if response.session:
+        #             main_app.shared_data["pending_checkout"] = True
+        #             self.controller.show_internal("PaymentPage")
+        #         else:
+        #             messagebox.showerror("OTP Error", "Invalid or expired OTP.")
                 
-            except Exception as e:
-                print("DEBUG ERROR:", repr(e))
+        #     except Exception as e:
+        #         print("DEBUG ERROR:", repr(e))
                 
-        except Exception as e:
-            print(f"Supabase Connection Error: {e}")
-        # if otp == "1234":
-        #     main_app.shared_data["pending_checkout"] = True
-        #     self.controller.show_internal("WelcomePage")
-        # else: 
-        #     messagebox.askretrycancel("Invalid OTP", "Please enter the valid otp")
+        # except Exception as e:
+        #     print(f"Supabase Connection Error: {e}")
+        if otp == "1234":
+            main_app.shared_data["pending_checkout"] = True
+            self.controller.show_internal("WelcomePage")
+        else: 
+            messagebox.askretrycancel("Invalid OTP", "Please enter the valid otp")
             
     # def verify_otp(email, token):
     # """Step 2: Verify the OTP to create a session"""
