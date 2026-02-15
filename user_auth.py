@@ -109,7 +109,29 @@ class EmailPage(tk.Frame):
                 self.controller.shared_data["mobile"] = result[1]
                 self.controller.controller.shared_data["user_info"]["phone"] = result[1]
                 self.controller.controller.shared_data["user_info"]["name"] = result[0]
-                self.controller.show_internal("OTPPage")
+                url = os.getenv("SUPABASE_URL")
+                key = os.getenv("SUPABASE_KEY")
+                supabase = create_client(url, key)
+
+                print("User registered in Supabase.")
+                response = supabase.auth.sign_in_with_otp(
+                        {
+                            "email": email,
+                            "options": {
+                                "should_create_user": True,
+                            },
+                        }
+                    )
+                    
+                print("OTP sent! Please check your email.")
+                
+                if response:
+                    messagebox.showinfo("Registration", "Details saved. Proceeding to OTP verification.")
+                    self.controller.show_internal("OTPPage")
+                else:
+                    messagebox.showerror("OTP error","otp sent failed")
+
+            
             else:
                 # checkout_message = "You have not . Please register to proceed with checkout."
                 confirm = messagebox.askokcancel("Register email", f"You have not registered with the mail \"{email}\".\n\nPlease register to proceed with checkout.")
