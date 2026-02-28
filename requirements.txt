@@ -2,3 +2,6 @@ supabase
 python-dotenv
 opencv-python
 pyzbar
+razorpay
+qrcode
+pillow

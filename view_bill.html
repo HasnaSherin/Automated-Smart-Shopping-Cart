@@ -75,7 +75,12 @@
 const SUPABASE_URL = "https://qlxpuodlnnwadifqlivq.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFseHB1b2Rsbm53YWRpZnFsaXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzIyMTksImV4cCI6MjA4MTY0ODIxOX0.h9Adajfrlcxj1QgjMAUkpXKPbPaRRpxIEtpz-VEeJrQ";
 
-const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const { client, error } = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+if (error) {
+    alert("Error connecting to database");
+    console.log(error);
+}
 
 async function loadBill() {
 

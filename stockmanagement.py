@@ -2,7 +2,7 @@ import sqlite3
 import random
 
 def purchase_item(barcode, quantity):
-    conn = sqlite3.connect("inventory.db")
+    conn = sqlite3.connect("cart_database.db")
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -46,7 +46,7 @@ def purchase_item(barcode, quantity):
 
 # -------- MAIN PROGRAM --------
 
-conn = sqlite3.connect("inventory.db")
+conn = sqlite3.connect("cart_database.db")
 cursor = conn.cursor()
 
 cursor.execute("SELECT barcode FROM products")

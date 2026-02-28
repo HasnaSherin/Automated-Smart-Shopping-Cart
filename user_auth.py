@@ -1,9 +1,11 @@
+from enum import verify
 import tkinter as tk
 from tkinter import font, messagebox
 import sqlite3
 from supabase import create_client
 import os
 import datetime
+from payment_page import PaymentPage
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -38,7 +40,8 @@ class AuthApp(tk.Frame):
         self.container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
-        for F in (EmailPage, RegisterPage, OTPPage, WelcomePage):
+
+        for F in (EmailPage, RegisterPage, OTPPage, PaymentPage, WelcomePage):
             page_name = F.__name__
             frame = F(parent=self.container, controller=self)
             self.frames[page_name] = frame
@@ -109,29 +112,7 @@ class EmailPage(tk.Frame):
                 self.controller.shared_data["mobile"] = result[1]
                 self.controller.controller.shared_data["user_info"]["phone"] = result[1]
                 self.controller.controller.shared_data["user_info"]["name"] = result[0]
-                url = os.getenv("SUPABASE_URL")
-                key = os.getenv("SUPABASE_KEY")
-                supabase = create_client(url, key)
-
-                print("User registered in Supabase.")
-                response = supabase.auth.sign_in_with_otp(
-                        {
-                            "email": email,
-                            "options": {
-                                "should_create_user": True,
-                            },
-                        }
-                    )
-                    
-                print("OTP sent! Please check your email.")
-                
-                if response:
-                    messagebox.showinfo("Registration", "Details saved. Proceeding to OTP verification.")
-                    self.controller.show_internal("OTPPage")
-                else:
-                    messagebox.showerror("OTP error","otp sent failed")
-
-            
+                self.controller.show_internal("OTPPage")
             else:
                 # checkout_message = "You have not . Please register to proceed with checkout."
                 confirm = messagebox.askokcancel("Register email", f"You have not registered with the mail \"{email}\".\n\nPlease register to proceed with checkout.")
@@ -278,8 +259,11 @@ class OTPPage(tk.Frame):
         # except Exception as e:
         #     print(f"Supabase Connection Error: {e}")
         if otp == "1234":
-            main_app.shared_data["pending_checkout"] = True
-            self.controller.show_internal("WelcomePage")
+            if main_app.shared_data.get("pending_checkout"):
+                # Send them to the new payment page!
+                self.controller.show_internal("PaymentPage")
+            else:
+                self.controller.show_internal("WelcomePage")
         else: 
             messagebox.askretrycancel("Invalid OTP", "Please enter the valid otp")
             
